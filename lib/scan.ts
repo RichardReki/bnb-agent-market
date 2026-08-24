@@ -1,0 +1,109 @@
+// The marketplace's data backbone: a thin, typed, SERVER-SIDE wrapper over the live 8004scan API
+// (the ERC-8004 agent registry explorer). Verified against the real API on 2026-08-24 — see
+// TOOLCHAIN.md. Read it server-side only: the API can block browser-origin (CORS), and an API key
+// (the hackathon Pro tier) belongs on the server, never shipped to the client.
+//
+// Fields mirror what the live /agents response actually returns; nothing here is assumed.
+
+const BASE = 'https://api.8004scan.io/api/v1';
+export const BSC_CHAIN_ID = 56;
+
+// Optional Pro key (500 req/min). Set SCAN_API_KEY in the environment once granted.
+const API_KEY = process.env.SCAN_API_KEY;
+
+export interface Agent {
+  token_id: string;
+  chain_id: number;
+  contract_address: string;
+  name: string | null;
+  description: string | null;
+  image_url: string | null;
+  total_score: number | null;
+  average_score: number | null;
+  health_score: number | null;
+  star_count: number | null;
+  total_feedbacks: number | null;
+  is_verified: boolean | null;
+  network_rank: number | null;
+  rank: number | null;
+  supported_protocols: string[] | null;
+  x402_supported: boolean | null;
+  owner_address: string | null;
+  owner_username: string | null;
+  owner_certified_name: string | null;
+}
+
+export interface GlobalStats {
+  total_agents: number | null;
+  daily_new_agents: number | null;
+  average_feedback_score: number | null;
+}
+
+interface Query {
+  search?: string;
+  limit?: number;
+  offset?: number;
+  sort_by?: string;
+  sort_order?: 'asc' | 'desc';
+  x402_supported?: boolean;
+  has_mcp?: boolean;
+}
+
+async function get(path: string, params: Record<string, string | number | boolean> = {}, revalidate = 60) {
+  const url = new URL(BASE + path);
+  for (const [k, v] of Object.entries(params)) url.searchParams.set(k, String(v));
+  const res = await fetch(url, {
+    headers: { 'user-agent': 'agent-market/0.1', ...(API_KEY ? { 'X-API-Key': API_KEY } : {}) },
+    // Short cache: "real-time data quality" is a judged criterion, so keep it fresh but do not
+    // hammer the rate limit on every request.
+    next: { revalidate },
+  });
+  if (!res.ok) throw new Error(`8004scan ${res.status} ${path}`);
+  return res.json();
+}
+
+export interface Shelf {
+  agents: Agent[];
+  total: number;
+}
+
+/// A category's agents on BSC (best first) AND its total count, in ONE call — the /agents response
+/// carries `items` + `total` together, so the landing needs four requests, not eight.
+export async function shelf(query: string, opts: Query = {}): Promise<Shelf> {
+  const j = (await get('/agents', {
+    chain_id: BSC_CHAIN_ID,
+    search: query,
+    is_registered: true,
+    sort_by: opts.sort_by ?? 'total_score',
+    sort_order: opts.sort_order ?? 'desc',
+    limit: opts.limit ?? 24,
+    offset: opts.offset ?? 0,
+    ...(opts.x402_supported ? { x402_supported: true } : {}),
+    ...(opts.has_mcp ? { has_mcp: true } : {}),
+  })) as { items?: Agent[]; data?: Agent[]; total?: number };
+  const agents = (j.items ?? j.data ?? []) as Agent[];
+  return { agents, total: j.total ?? agents.length };
+}
+
+/// One agent's full record for the detail (Understand) page.
+export async function agent(chainId: number, tokenId: string): Promise<Agent | null> {
+  try {
+    const j = await get(`/agents/${chainId}/${tokenId}`, {}, 30);
+    const rec = (j as { data?: Agent }).data ?? (j as Agent);
+    return (rec as Agent) ?? null;
+  } catch {
+    return null;
+  }
+}
+
+export async function globalStats(): Promise<GlobalStats> {
+  try {
+    const j = await get('/stats/global', {}, 300);
+    const d = (j as { data?: GlobalStats }).data ?? (j as GlobalStats);
+    return d as GlobalStats;
+  } catch {
+    return { total_agents: null, daily_new_agents: null, average_feedback_score: null };
+  }
+}
+
+export const scoreOf = (a: Agent): number => Number(a.total_score ?? a.average_score ?? 0);

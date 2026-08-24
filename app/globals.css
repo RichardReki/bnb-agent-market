@@ -1,0 +1,110 @@
+/* Agent Market — a front door for on-chain agents.
+   Design: charcoal + a restrained BNB gold, deliberately native to the ecosystem this wants to be
+   adopted into. Data is the hero, so numbers/scores/addresses are set in mono and given room; the
+   UI chrome stays quiet. Per-category accents tint the four shelves so diversity reads at a glance. */
+
+:root {
+  --bg: #0c0e12;
+  --panel: #141821;
+  --panel-2: #1a1f2a;
+  --line: #232a36;
+  --line-soft: #1b2029;
+  --fg: #e8ebf0;
+  --muted: #8a94a4;
+  --faint: #5a6474;
+  --gold: #f0b90b; /* BNB */
+  --gold-dim: #b8890a;
+  --ok: #2dd4a7;
+  --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+  --sans: -apple-system, system-ui, "Segoe UI", Roboto, sans-serif;
+}
+
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font: 15px/1.6 var(--sans);
+  letter-spacing: 0.005em;
+}
+a { color: inherit; text-decoration: none; }
+.mono { font-family: var(--mono); }
+
+.wrap { max-width: 1120px; margin: 0 auto; padding: 0 clamp(16px, 4vw, 32px); }
+
+/* header */
+.top {
+  position: sticky; top: 0; z-index: 20;
+  background: color-mix(in srgb, var(--bg) 88%, transparent);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--line);
+}
+.top-in { display: flex; align-items: center; gap: 20px; height: 60px; }
+.brand { font-family: var(--mono); font-weight: 600; letter-spacing: -0.01em; font-size: 16px; }
+.brand b { color: var(--gold); }
+.brand span { color: var(--faint); font-weight: 400; }
+.top nav { display: flex; gap: 6px; margin-left: auto; flex-wrap: wrap; }
+.top nav a {
+  font-family: var(--mono); font-size: 12.5px; color: var(--muted);
+  padding: 6px 11px; border-radius: 7px; border: 1px solid transparent;
+}
+.top nav a:hover { color: var(--fg); border-color: var(--line); }
+.top nav a.on { color: var(--bg); background: var(--gold); font-weight: 600; }
+
+/* hero */
+.hero { padding: clamp(36px, 6vw, 64px) 0 clamp(20px, 3vw, 28px); }
+.hero h1 { margin: 0; font-size: clamp(28px, 5vw, 44px); line-height: 1.08; letter-spacing: -0.03em; font-weight: 650; max-width: 16ch; }
+.hero h1 em { font-style: normal; color: var(--gold); }
+.hero p { margin: 14px 0 0; color: var(--muted); font-size: clamp(15px, 2vw, 17px); max-width: 60ch; }
+
+/* stat strip */
+.stats { display: flex; flex-wrap: wrap; gap: 28px; margin-top: 26px; padding-top: 22px; border-top: 1px solid var(--line); }
+.stat .n { font-family: var(--mono); font-size: 22px; letter-spacing: -0.02em; }
+.stat .k { font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--faint); margin-top: 2px; }
+
+/* section / shelf */
+section.shelf { margin: clamp(30px, 5vw, 44px) 0; }
+.shelf-head { display: flex; align-items: baseline; gap: 12px; margin-bottom: 14px; }
+.shelf-head .dot { width: 9px; height: 9px; border-radius: 50%; flex: none; }
+.shelf-head h2 { margin: 0; font-size: 17px; font-weight: 600; letter-spacing: -0.01em; }
+.shelf-head .count { font-family: var(--mono); font-size: 12px; color: var(--faint); }
+.shelf-head .blurb { color: var(--muted); font-size: 13.5px; margin-left: auto; max-width: 46ch; text-align: right; }
+.shelf-head a.more { font-family: var(--mono); font-size: 12px; color: var(--gold); margin-left: 14px; white-space: nowrap; }
+
+.grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
+
+/* agent card */
+.card {
+  display: block; background: var(--panel); border: 1px solid var(--line-soft);
+  border-radius: 11px; padding: 14px; transition: border-color .15s, transform .15s, background .15s;
+}
+.card:hover { border-color: var(--line); background: var(--panel-2); transform: translateY(-1px); }
+.card-top { display: flex; align-items: center; gap: 10px; }
+.avatar { width: 34px; height: 34px; border-radius: 8px; flex: none; background: var(--panel-2); border: 1px solid var(--line); object-fit: cover; display: grid; place-items: center; font-family: var(--mono); font-size: 14px; color: var(--muted); }
+.card-name { font-weight: 600; font-size: 14.5px; line-height: 1.2; display: flex; align-items: center; gap: 6px; min-width: 0; }
+.card-name .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.verified { color: var(--gold); flex: none; font-size: 12px; }
+.card-owner { font-family: var(--mono); font-size: 11px; color: var(--faint); margin-top: 1px; }
+.card-desc { color: var(--muted); font-size: 12.5px; line-height: 1.45; margin: 10px 0 12px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; min-height: 2.9em; }
+.card-foot { display: flex; align-items: center; gap: 14px; border-top: 1px solid var(--line-soft); padding-top: 10px; }
+.metric { display: flex; flex-direction: column; }
+.metric .v { font-family: var(--mono); font-size: 13px; font-weight: 600; }
+.metric .l { font-size: 9.5px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--faint); }
+.tag { margin-left: auto; font-family: var(--mono); font-size: 10px; color: var(--ok); border: 1px solid color-mix(in srgb, var(--ok) 35%, var(--line)); border-radius: 5px; padding: 2px 6px; }
+
+/* empty / notes */
+.empty { color: var(--faint); font-size: 13px; font-family: var(--mono); padding: 20px 0; }
+.note { color: var(--faint); font-size: 12px; }
+
+footer { border-top: 1px solid var(--line); margin-top: 60px; padding: 22px 0 60px; color: var(--faint); font-size: 12.5px; font-family: var(--mono); display: flex; gap: 8px 20px; flex-wrap: wrap; }
+
+/* category browse header */
+.cat-hero { padding: clamp(28px, 5vw, 48px) 0 20px; border-bottom: 1px solid var(--line); }
+.cat-hero .eyebrow { font-family: var(--mono); font-size: 12px; letter-spacing: 0.1em; text-transform: uppercase; }
+.cat-hero h1 { margin: 8px 0 0; font-size: clamp(26px, 4vw, 36px); letter-spacing: -0.02em; }
+.cat-hero p { color: var(--muted); margin: 10px 0 0; max-width: 60ch; }
+.back { font-family: var(--mono); font-size: 12px; color: var(--muted); }
+.back:hover { color: var(--gold); }
+
+:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
