@@ -138,4 +138,21 @@ export async function globalStats(): Promise<GlobalStats> {
   }
 }
 
+/// Free-text search across all BSC agents (any category), best first. Same /agents endpoint, no
+/// category constraint — powers the header search box.
+export async function search(q: string, limit = 40): Promise<Shelf> {
+  const term = q.trim();
+  if (!term) return { agents: [], total: 0 };
+  const j = (await get('/agents', {
+    chain_id: BSC_CHAIN_ID,
+    search: term,
+    is_registered: true,
+    sort_by: 'total_score',
+    sort_order: 'desc',
+    limit,
+  })) as { items?: Agent[]; data?: Agent[]; total?: number };
+  const agents = (j.items ?? j.data ?? []) as Agent[];
+  return { agents, total: j.total ?? agents.length };
+}
+
 export const scoreOf = (a: Agent): number => Number(a.total_score ?? a.average_score ?? 0);

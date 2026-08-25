@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import './globals.css';
 import { Providers } from './providers';
+import { SearchBox } from '@/components/SearchBox';
 
 export const metadata: Metadata = {
   title: 'Agent Market — the front door for on-chain agents on BSC',
@@ -17,6 +18,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <a className="brand" href="/">
               agent<b>·</b>market <span>/ bsc</span>
             </a>
+            <SearchBox />
             <nav>
               <a href="/agents/rebalancing">Rebalancing</a>
               <a href="/agents/grid">Grid</a>

@@ -158,3 +158,11 @@ footer { border-top: 1px solid var(--line); margin-top: 60px; padding: 22px 0 60
 .hire-btn:disabled { opacity: 0.6; cursor: default; }
 .hire-connected { font-family: var(--mono); font-size: 12.5px; color: var(--muted); display: flex; align-items: center; gap: 7px; }
 .hire-connected .ok-dot { color: var(--ok); font-size: 10px; }
+
+/* ---- header search ---- */
+.search { display: flex; align-items: center; gap: 7px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 0 10px; height: 34px; min-width: 180px; max-width: 300px; flex: 1 1 auto; }
+.search:focus-within { border-color: color-mix(in srgb, var(--gold) 45%, var(--line)); }
+.search-i { color: var(--faint); font-size: 15px; }
+.search input { background: none; border: none; outline: none; color: var(--fg); font: 13px var(--mono); width: 100%; }
+.search input::placeholder { color: var(--faint); }
+@media (max-width: 560px) { .search { order: 3; flex-basis: 100%; max-width: none; } .top-in { flex-wrap: wrap; height: auto; padding: 10px 0; } }
