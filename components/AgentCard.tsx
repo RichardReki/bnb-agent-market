@@ -11,7 +11,7 @@ export function AgentCard({ agent }: { agent: Agent }) {
   const score = scoreOf(agent);
   const fb = agent.total_feedbacks ?? 0;
   return (
-    <a className="card" href={`https://8004scan.io/agent/${agent.chain_id}/${agent.token_id}`} target="_blank" rel="noreferrer">
+    <a className="card" href={`/agent/${agent.chain_id}/${agent.token_id}`}>
       <div className="card-top">
         {agent.image_url ? (
           // eslint-disable-next-line @next/next/no-img-element

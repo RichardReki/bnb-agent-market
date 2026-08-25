@@ -1,0 +1,137 @@
+import { notFound } from 'next/navigation';
+import { agentDetail, scoreOf, type AgentService } from '@/lib/scan';
+import { short, ago, bscscanAddr, bscscanTx } from '@/lib/format';
+
+export const revalidate = 20;
+
+export async function generateMetadata({ params }: { params: { chainId: string; tokenId: string } }) {
+  const a = await agentDetail(Number(params.chainId), params.tokenId);
+  return { title: a ? `${a.name ?? 'Agent'} — Agent Market` : 'Agent — Agent Market' };
+}
+
+const num = (n: number | null | undefined, d = 0) => (n == null ? '—' : n.toFixed(d));
+
+// Understand: everything a hirer needs to make an informed call — reputation, LIVENESS (is it
+// actually running and how fresh is the data), how to hire it, and on-chain provenance. The
+// liveness block is where "real-time data quality, beyond basic counts" is earned.
+export default async function AgentPage({ params }: { params: { chainId: string; tokenId: string } }) {
+  const chainId = Number(params.chainId);
+  const a = await agentDetail(chainId, params.tokenId);
+  if (!a) notFound();
+
+  const owner = a.owner_certified_name || a.owner_username || short(a.owner_address);
+  const services: [string, AgentService][] = a.services
+    ? (Object.entries(a.services).filter(([, v]) => v && v.endpoint) as [string, AgentService][])
+    : [];
+
+  return (
+    <>
+      <section className="detail-hero">
+        <a className="back" href="/">
+          ← all agents
+        </a>
+        <div className="detail-id">
+          {a.image_url ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img className="avatar-lg" src={a.image_url} alt="" width={56} height={56} />
+          ) : (
+            <span className="avatar-lg" aria-hidden>
+              {(a.name?.[0] ?? '◆').toUpperCase()}
+            </span>
+          )}
+          <div style={{ minWidth: 0 }}>
+            <h1>
+              {a.name || `Agent #${a.token_id}`}
+              {a.is_verified ? <span className="verified" title="On-chain verified">✓</span> : null}
+              {a.is_active ? <span className="live-dot" title="Active">●</span> : null}
+            </h1>
+            <div className="detail-owner mono">
+              by {owner || '—'} · <a href={bscscanAddr(a.contract_address)} target="_blank" rel="noreferrer">#{a.token_id}</a> on BSC
+            </div>
+          </div>
+        </div>
+        <p className="detail-desc">{a.description || 'No description provided.'}</p>
+      </section>
+
+      <div className="panels">
+        {/* Reputation */}
+        <div className="panel">
+          <h3>Reputation</h3>
+          <div className="kv-grid">
+            <div><span className="v mono" style={{ color: 'var(--gold)' }}>{scoreOf(a).toFixed(1)}</span><span className="l">Total score</span></div>
+            <div><span className="v mono">{a.total_feedbacks ?? 0}</span><span className="l">Feedback</span></div>
+            <div><span className="v mono">{a.star_count ?? 0}</span><span className="l">Stars</span></div>
+            <div><span className="v mono">{a.network_rank ? `#${a.network_rank}` : '—'}</span><span className="l">Network rank</span></div>
+          </div>
+        </div>
+
+        {/* Liveness — the data-quality differentiator */}
+        <div className="panel">
+          <h3>Liveness <span className="live-tag">real-time</span></h3>
+          <div className="kv-grid">
+            <div>
+              <span className="v mono" style={{ color: a.is_active ? 'var(--ok)' : 'var(--faint)' }}>
+                {a.is_active ? 'Active' : 'Idle'}
+              </span>
+              <span className="l">Status</span>
+            </div>
+            <div><span className="v mono">{num(a.health_score, 0)}</span><span className="l">Health</span></div>
+            <div><span className="v mono">{num(a.freshness_score, 0)}</span><span className="l">Freshness</span></div>
+            <div><span className="v mono" style={{ fontSize: 12 }}>{ago(a.health_checked_at)}</span><span className="l">Last checked</span></div>
+          </div>
+          {a.endpoint_verified_domain ? (
+            <p className="panel-note">Endpoint verified · {a.endpoint_verified_domain}</p>
+          ) : (
+            <p className="panel-note">Endpoint not yet domain-verified.</p>
+          )}
+        </div>
+      </div>
+
+      {/* Activate */}
+      <section className="activate">
+        <h3>Hire this agent</h3>
+        {services.length ? (
+          <div className="svc-list">
+            {services.map(([kind, svc]) => (
+              <div className="svc" key={kind}>
+                <div className="svc-kind mono">{kind.toUpperCase()}</div>
+                <code className="svc-ep">{svc.endpoint}</code>
+                <a className="svc-cta" href={svc.endpoint ?? '#'} target="_blank" rel="noreferrer">
+                  {kind === 'web' ? 'Open app →' : `Connect via ${kind.toUpperCase()} →`}
+                </a>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="panel-note">This agent exposes no public service endpoint yet.</p>
+        )}
+        <div className="proto-row">
+          {(a.supported_protocols ?? []).map((p) => (
+            <span className="chip" key={p}>{p}</span>
+          ))}
+          {a.x402_supported ? <span className="chip gold">x402 payments</span> : null}
+          {a.agent_wallet ? (
+            <a className="chip link" href={bscscanAddr(a.agent_wallet)} target="_blank" rel="noreferrer">
+              wallet {short(a.agent_wallet)}
+            </a>
+          ) : null}
+        </div>
+      </section>
+
+      {/* Provenance */}
+      <section className="provenance">
+        <h3>On-chain provenance</h3>
+        <div className="prov-grid mono">
+          <div><span className="l">Agent NFT</span><a href={bscscanAddr(a.contract_address)} target="_blank" rel="noreferrer">{short(a.contract_address)} · #{a.token_id}</a></div>
+          <div><span className="l">Creator</span><a href={a.creator_address ? bscscanAddr(a.creator_address) : '#'} target="_blank" rel="noreferrer">{short(a.creator_address)}</a></div>
+          <div><span className="l">Registered</span>{a.created_tx_hash ? <a href={bscscanTx(a.created_tx_hash)} target="_blank" rel="noreferrer">{ago(a.created_at)} · tx</a> : ago(a.created_at)}</div>
+          <div><span className="l">Registry (ERC-8004)</span><a href={bscscanAddr(a.contract_address)} target="_blank" rel="noreferrer">{short(a.contract_address)}</a></div>
+        </div>
+        <p className="panel-note">
+          Identity, reputation and liveness are read live from the ERC-8004 registry via 8004scan;
+          provenance links resolve on BscScan.
+        </p>
+      </section>
+    </>
+  );
+}

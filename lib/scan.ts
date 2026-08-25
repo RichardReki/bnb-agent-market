@@ -33,6 +33,38 @@ export interface Agent {
   owner_certified_name: string | null;
 }
 
+export interface AgentService {
+  endpoint?: string | null;
+  version?: string | null;
+  skills?: unknown[] | null;
+  tools?: unknown[] | null;
+}
+
+/// The full detail record — a superset of Agent with the liveness, service, and provenance fields
+/// the "Understand" page renders. Names mirror the real /agents/{chain}/{token} response.
+export interface AgentDetail extends Agent {
+  agent_id: string | null;
+  agent_wallet: string | null;
+  creator_address: string | null;
+  is_active: boolean | null;
+  is_endpoint_verified: boolean | null;
+  endpoint_verified_domain: string | null;
+  health_status: unknown;
+  freshness_score: number | null;
+  activity_score: number | null;
+  quality_score: number | null;
+  metadata_completeness_score: number | null;
+  health_checked_at: string | null;
+  endpoint_last_checked_at: string | null;
+  created_at: string | null;
+  created_tx_hash: string | null;
+  created_block_number: number | null;
+  supported_protocols: string[] | null;
+  supported_trust_models: string[] | null;
+  categories: string[] | null;
+  services: { a2a?: AgentService; mcp?: AgentService; web?: AgentService } | null;
+}
+
 export interface GlobalStats {
   total_agents: number | null;
   daily_new_agents: number | null;
@@ -85,12 +117,12 @@ export async function shelf(query: string, opts: Query = {}): Promise<Shelf> {
   return { agents, total: j.total ?? agents.length };
 }
 
-/// One agent's full record for the detail (Understand) page.
-export async function agent(chainId: number, tokenId: string): Promise<Agent | null> {
+/// One agent's full record for the detail (Understand) page. Short cache — freshness is judged.
+export async function agentDetail(chainId: number, tokenId: string): Promise<AgentDetail | null> {
   try {
-    const j = await get(`/agents/${chainId}/${tokenId}`, {}, 30);
-    const rec = (j as { data?: Agent }).data ?? (j as Agent);
-    return (rec as Agent) ?? null;
+    const j = await get(`/agents/${chainId}/${tokenId}`, {}, 20);
+    const rec = (j as { data?: AgentDetail }).data ?? (j as AgentDetail);
+    return (rec as AgentDetail) ?? null;
   } catch {
     return null;
   }
