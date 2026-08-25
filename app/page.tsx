@@ -20,6 +20,8 @@ export default async function Home() {
     ),
   ]);
 
+  const bscTotal = shelves.reduce((s, x) => s + x.count, 0);
+
   return (
     <>
       <section className="hero">
@@ -36,20 +38,43 @@ export default async function Home() {
             <div className="k">Agents indexed</div>
           </div>
           <div className="stat">
-            <div className="n mono">{CATEGORIES.length}</div>
-            <div className="k">Categories</div>
+            <div className="n mono" style={{ color: 'var(--ok)' }}>+{fmt(stats.daily_new_agents)}</div>
+            <div className="k">New · 24h</div>
           </div>
           <div className="stat">
             <div className="n mono">
-              {stats.average_feedback_score != null ? stats.average_feedback_score.toFixed(1) : '—'}
+              {stats.average_feedback_score != null ? stats.average_feedback_score.toFixed(0) : '—'}
             </div>
             <div className="k">Avg feedback</div>
           </div>
           <div className="stat">
             <div className="n mono" style={{ color: 'var(--gold)' }}>
-              BSC
+              {fmt(bscTotal)}
             </div>
-            <div className="k">Chain · 56</div>
+            <div className="k">On BSC · in-category</div>
+          </div>
+        </div>
+
+        {/* The diversity signal, up front: the four judged categories as a live proportional band. */}
+        <div className="dist">
+          <div className="dist-bar">
+            {shelves.map(({ cat, count }) => (
+              <span
+                key={cat.key}
+                className="dist-seg"
+                style={{ flexGrow: Math.max(count, 1), background: cat.accent }}
+                title={`${cat.label}: ${count}`}
+              />
+            ))}
+          </div>
+          <div className="dist-legend">
+            {shelves.map(({ cat, count }) => (
+              <a className="dist-item" key={cat.key} href={`/agents/${cat.key}`}>
+                <span className="dist-dot" style={{ background: cat.accent }} />
+                <span className="dist-label">{cat.label}</span>
+                <span className="dist-count mono">{count}</span>
+              </a>
+            ))}
           </div>
         </div>
       </section>

@@ -1,5 +1,5 @@
 import { notFound } from 'next/navigation';
-import { agentDetail, scoreOf, type AgentService } from '@/lib/scan';
+import { agentDetail, scoreOf, reputationDimensions, type AgentService } from '@/lib/scan';
 import { short, ago, bscscanAddr, bscscanTx } from '@/lib/format';
 import { HirePanel } from '@/components/HirePanel';
 
@@ -24,6 +24,7 @@ export default async function AgentPage({ params }: { params: { chainId: string;
   const services: [string, AgentService][] = a.services
     ? (Object.entries(a.services).filter(([, v]) => v && v.endpoint) as [string, AgentService][])
     : [];
+  const dims = reputationDimensions(a);
 
   return (
     <>
@@ -87,6 +88,31 @@ export default async function AgentPage({ params }: { params: { chainId: string;
           )}
         </div>
       </div>
+
+      {/* Reputation breakdown — the single score, made transparent */}
+      {dims.length ? (
+        <section className="breakdown">
+          <h3>How this score is built</h3>
+          <div className="dim-list">
+            {dims.map((d) => (
+              <div className="dim" key={d.key}>
+                <div className="dim-head">
+                  <span className="dim-label">{d.label}</span>
+                  <span className="dim-weight mono">{Math.round(d.weight * 100)}% weight</span>
+                  <span className="dim-score mono">{d.score.toFixed(0)}</span>
+                </div>
+                <div className="dim-track">
+                  <span className="dim-fill" style={{ width: `${Math.min(100, Math.max(0, d.score))}%` }} />
+                </div>
+              </div>
+            ))}
+          </div>
+          <p className="panel-note">
+            Weighted dimensions from the 8004scan reputation model (v5) — service quality, engagement,
+            publisher trust, metadata compliance, and momentum — not a single opaque number.
+          </p>
+        </section>
+      ) : null}
 
       {/* Activate */}
       <section className="activate">

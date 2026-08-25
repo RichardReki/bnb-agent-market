@@ -63,6 +63,24 @@ export interface AgentDetail extends Agent {
   supported_trust_models: string[] | null;
   categories: string[] | null;
   services: { a2a?: AgentService; mcp?: AgentService; web?: AgentService } | null;
+  scores: { breakdown?: { dimensions?: Record<string, { score?: number; weight?: number }> } } | null;
+}
+
+/// The reputation sub-scores (0–100) that make up an agent's total, best first by weight. Empty if
+/// the agent has no scoring breakdown yet.
+export function reputationDimensions(a: AgentDetail): { key: string; label: string; score: number; weight: number }[] {
+  const dims = a.scores?.breakdown?.dimensions;
+  if (!dims) return [];
+  const labels: Record<string, string> = {
+    service: 'Service',
+    engagement: 'Engagement',
+    publisher: 'Publisher',
+    compliance: 'Compliance',
+    momentum: 'Momentum',
+  };
+  return Object.entries(dims)
+    .map(([key, v]) => ({ key, label: labels[key] ?? key, score: Number(v?.score ?? 0), weight: Number(v?.weight ?? 0) }))
+    .sort((x, y) => y.weight - x.weight);
 }
 
 export interface GlobalStats {
