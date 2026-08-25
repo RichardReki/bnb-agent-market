@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation';
 import { agentDetail, scoreOf, type AgentService } from '@/lib/scan';
 import { short, ago, bscscanAddr, bscscanTx } from '@/lib/format';
+import { HirePanel } from '@/components/HirePanel';
 
 export const revalidate = 20;
 
@@ -90,32 +91,12 @@ export default async function AgentPage({ params }: { params: { chainId: string;
       {/* Activate */}
       <section className="activate">
         <h3>Hire this agent</h3>
-        {services.length ? (
-          <div className="svc-list">
-            {services.map(([kind, svc]) => (
-              <div className="svc" key={kind}>
-                <div className="svc-kind mono">{kind.toUpperCase()}</div>
-                <code className="svc-ep">{svc.endpoint}</code>
-                <a className="svc-cta" href={svc.endpoint ?? '#'} target="_blank" rel="noreferrer">
-                  {kind === 'web' ? 'Open app →' : `Connect via ${kind.toUpperCase()} →`}
-                </a>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <p className="panel-note">This agent exposes no public service endpoint yet.</p>
-        )}
-        <div className="proto-row">
-          {(a.supported_protocols ?? []).map((p) => (
-            <span className="chip" key={p}>{p}</span>
-          ))}
-          {a.x402_supported ? <span className="chip gold">x402 payments</span> : null}
-          {a.agent_wallet ? (
-            <a className="chip link" href={bscscanAddr(a.agent_wallet)} target="_blank" rel="noreferrer">
-              wallet {short(a.agent_wallet)}
-            </a>
-          ) : null}
-        </div>
+        <HirePanel
+          services={services}
+          x402={!!a.x402_supported}
+          agentWallet={a.agent_wallet}
+          protocols={a.supported_protocols ?? []}
+        />
       </section>
 
       {/* Provenance */}

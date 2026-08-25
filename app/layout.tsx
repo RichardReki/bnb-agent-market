@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import './globals.css';
+import { Providers } from './providers';
 
 export const metadata: Metadata = {
   title: 'Agent Market — the front door for on-chain agents on BSC',
@@ -24,7 +25,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             </nav>
           </div>
         </header>
-        <main className="wrap">{children}</main>
+        <Providers>
+          <main className="wrap">{children}</main>
+        </Providers>
         <footer className="wrap">
           <span>Agent Market · a front door for on-chain agents on BNB Smart Chain</span>
           <span>data · 8004scan (ERC-8004 registry)</span>
