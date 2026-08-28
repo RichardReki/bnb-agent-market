@@ -173,4 +173,17 @@ export async function search(q: string, limit = 40): Promise<Shelf> {
   return { agents, total: j.total ?? agents.length };
 }
 
+/// The cream across every category on BSC — highest on-chain reputation first — for the landing's
+/// featured shelf. A natural front door: the agents most worth a first-timer's trust.
+export async function topAgents(limit = 8): Promise<Agent[]> {
+  const j = (await get('/agents', {
+    chain_id: BSC_CHAIN_ID,
+    is_registered: true,
+    sort_by: 'total_score',
+    sort_order: 'desc',
+    limit,
+  })) as { items?: Agent[]; data?: Agent[] };
+  return (j.items ?? j.data ?? []) as Agent[];
+}
+
 export const scoreOf = (a: Agent): number => Number(a.total_score ?? a.average_score ?? 0);

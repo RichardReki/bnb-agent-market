@@ -1,5 +1,5 @@
 import { CATEGORIES } from '@/lib/categories';
-import { shelf, globalStats } from '@/lib/scan';
+import { shelf, globalStats, topAgents } from '@/lib/scan';
 import { AgentCard } from '@/components/AgentCard';
 
 // Server component — all data is fetched server-side from the live 8004scan API. The landing IS the
@@ -10,7 +10,7 @@ export const revalidate = 60;
 const fmt = (n: number | null | undefined) => (n == null ? '—' : Intl.NumberFormat('en').format(n));
 
 export default async function Home() {
-  const [stats, shelves] = await Promise.all([
+  const [stats, shelves, featured] = await Promise.all([
     globalStats(),
     Promise.all(
       CATEGORIES.map(async (c) => {
@@ -18,6 +18,7 @@ export default async function Home() {
         return { cat: c, agents: s.agents, count: s.total };
       }),
     ),
+    topAgents(4),
   ]);
 
   const bscTotal = shelves.reduce((s, x) => s + x.count, 0);
@@ -78,6 +79,22 @@ export default async function Home() {
           </div>
         </div>
       </section>
+
+      {featured.length ? (
+        <section className="shelf featured">
+          <div className="shelf-head">
+            <span className="dot" style={{ background: 'var(--gold)' }} />
+            <h2>Top-rated on BSC</h2>
+            <span className="count">highest on-chain reputation</span>
+            <span className="blurb">The agents most worth a first-timer&rsquo;s trust — across every category.</span>
+          </div>
+          <div className="grid">
+            {featured.map((a) => (
+              <AgentCard key={`f-${a.chain_id}-${a.token_id}`} agent={a} />
+            ))}
+          </div>
+        </section>
+      ) : null}
 
       {shelves.map(({ cat, agents, count }) => (
         <section className="shelf" key={cat.key}>

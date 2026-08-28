@@ -1,5 +1,6 @@
 import type { Agent } from '@/lib/scan';
 import { scoreOf } from '@/lib/scan';
+import { isOurs } from '@/lib/ours';
 
 const short = (a: string | null) => (a ? `${a.slice(0, 6)}…${a.slice(-4)}` : '');
 const initial = (name: string | null) => (name?.trim()?.[0] ?? '◆').toUpperCase();
@@ -25,6 +26,9 @@ export function AgentCard({ agent }: { agent: Agent }) {
           <div className="card-name">
             <span className="nm">{agent.name || `Agent #${agent.token_id}`}</span>
             {agent.is_verified ? <span className="verified" title="On-chain verified">✓</span> : null}
+            {isOurs(agent.token_id) ? (
+              <span className="ours" title="Reference agent, built by Agent Market">◆</span>
+            ) : null}
           </div>
           <div className="card-owner">{owner || '—'}</div>
         </div>
