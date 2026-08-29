@@ -25,6 +25,32 @@ const name = (process.env.AGENT ?? 'health') as keyof typeof AGENTS;
 const chainId = Number(process.env.CHAIN ?? 97) as 56 | 97;
 const dry = process.argv.includes('--dry');
 
+// Validate the key before anything else costs time. It is the cheapest check here and the most
+// likely thing to be wrong, so failing on it after two network preflights wastes a run and reports
+// the failure from inside viem's curve code, which says nothing about what to fix.
+const KEY_RE = /^0x[0-9a-fA-F]{64}$/;
+if (!dry) {
+  const raw = process.env.PRIVATE_KEY;
+  if (!raw) {
+    throw new Error('set PRIVATE_KEY (or pass --dry to inspect the metadata without sending)');
+  }
+  if (!KEY_RE.test(raw)) {
+    const hex = /^0x[0-9a-fA-F]*$/.test(raw);
+    const why = !hex
+      ? 'it contains characters that are not hex — a placeholder pasted verbatim looks exactly like this'
+      : raw.length === 42
+        ? 'that is 20 bytes, which is an ADDRESS, not a private key'
+        : `it is ${Math.max(0, (raw.length - 2) / 2)} bytes, and a private key is 32`;
+    throw new Error(
+      [
+        `PRIVATE_KEY is not a private key: ${why}.`,
+        'Expected 0x followed by exactly 64 hex characters.',
+        'The value is never printed here, and nothing has been sent.',
+      ].join('\n'),
+    );
+  }
+}
+
 const meta = AGENTS[name];
 if (!meta) throw new Error(`unknown AGENT "${name}" — one of: ${Object.keys(AGENTS).join(', ')}`);
 
@@ -139,11 +165,10 @@ if (dry) {
   process.exit(0);
 }
 
-const pk = process.env.PRIVATE_KEY;
-if (!pk) throw new Error('set PRIVATE_KEY (or pass --dry to inspect without sending)');
+const pk = process.env.PRIVATE_KEY as `0x${string}`;
 
 const chain = chainId === 56 ? bsc : bscTestnet;
-const account = privateKeyToAccount(pk as `0x${string}`);
+const account = privateKeyToAccount(pk);
 const wallet = createWalletClient({ account, chain, transport: http() });
 const pub = createPublicClient({ chain, transport: http() });
 
