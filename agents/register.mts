@@ -49,6 +49,48 @@ console.log(`Endpoint   ${meta.services[0]?.endpoint}`);
 console.log(`agentURI   ${agentURI.length} bytes, round-trip verified`);
 console.log(`selector   ${calldata.slice(0, 10)}  (register(string,(string,bytes)[]))`);
 
+// Preflight the service endpoint before spending gas. The agentURI is an immutable inline data URI:
+// once registered, a dead or malformed card can never be corrected on that token. 8004scan
+// health-checks this URL, and the service dimension is the heaviest-weighted slice of the reputation
+// score, so registering against a 404 permanently caps the agent's standing. Cheap check, no undo.
+async function preflight(url: string): Promise<string | null> {
+  let res: Response;
+  try {
+    res = await fetch(url, { headers: { accept: 'application/json' } });
+  } catch (e) {
+    return `unreachable: ${(e as Error).message}`;
+  }
+  if (!res.ok) return `HTTP ${res.status} ${res.statusText}`;
+  let card: unknown;
+  try {
+    card = await res.json();
+  } catch {
+    return 'response is not valid JSON';
+  }
+  // The minimum shape an indexer needs to treat this as a real A2A card.
+  const c = card as { name?: unknown; skills?: unknown };
+  if (typeof c.name !== 'string' || !c.name) return 'card has no "name"';
+  if (!Array.isArray(c.skills) || c.skills.length === 0) return 'card declares no skills';
+  return null;
+}
+
+const problem = await preflight(meta.services[0]!.endpoint);
+if (problem) {
+  if (!dry) {
+    throw new Error(
+      [
+        `service endpoint check failed — ${problem}`,
+        `  ${meta.services[0]!.endpoint}`,
+        'Refusing to register: the agentURI is immutable, so a dead endpoint cannot be fixed later.',
+        'Deploy the site first, confirm the URL serves the agent card, then re-run.',
+      ].join('\n'),
+    );
+  }
+  console.log(`Endpoint   ⚠ ${problem} (tolerated in --dry; must pass before a real registration)`);
+} else {
+  console.log('Endpoint   ✓ live, serves a parseable agent card');
+}
+
 if (dry) {
   console.log('\n--dry: nothing sent. Metadata that would go on-chain:\n');
   console.log(JSON.stringify(decoded, null, 2));
