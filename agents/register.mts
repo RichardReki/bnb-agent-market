@@ -31,6 +31,16 @@ if (!meta) throw new Error(`unknown AGENT "${name}" — one of: ${Object.keys(AG
 const registry = REGISTRY[chainId];
 if (!registry) throw new Error(`no registry for chain ${chainId} (use 56 or 97)`);
 
+// The marketplace's shelves query chain 56 only (lib/scan.ts, BSC_CHAIN_ID). An agent registered on
+// testnet is indexed by 8004scan but will never appear on our own site — which is the whole point of
+// registering it. Testnet is for rehearsal; the real registration is mainnet.
+if (chainId !== 56) {
+  console.log(
+    `\nNote: chain ${chainId} is a rehearsal. The marketplace only lists chain 56, so this` +
+      '\n      agent will not appear on the site. Re-run with CHAIN=56 for the real registration.',
+  );
+}
+
 const agentURI = toAgentURI(meta);
 
 // Verify the encoding round-trips BEFORE spending gas. A malformed URI would register an agent that
@@ -108,7 +118,13 @@ const pub = createPublicClient({ chain, transport: http() });
 const balance = await pub.getBalance({ address: account.address });
 console.log(`\nSender     ${account.address}`);
 console.log(`Balance    ${Number(balance) / 1e18} BNB`);
-if (balance === 0n) throw new Error('sender has no BNB — fund it at https://testnet.bnbchain.org/faucet-smart');
+if (balance === 0n) {
+  throw new Error(
+    chainId === 56
+      ? 'sender has no BNB — a mainnet registration costs real gas (a fraction of a cent); fund the address above'
+      : 'sender has no test BNB — fund it at https://testnet.bnbchain.org/faucet-smart',
+  );
+}
 
 const hash = await wallet.writeContract({
   address: registry as `0x${string}`,
