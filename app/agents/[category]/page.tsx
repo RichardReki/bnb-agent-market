@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation';
 import { byKey } from '@/lib/categories';
 import { shelf, type Shelf } from '@/lib/scan';
 import { AgentCard } from '@/components/AgentCard';
+import { ShelfEmpty } from '@/components/ShelfEmpty';
 import { Pagination, PAGE_SIZE, parsePage } from '@/components/Pagination';
 
 export const revalidate = 60;
@@ -65,7 +66,7 @@ export default async function CategoryPage({
             />
           </>
         ) : (
-          <div className="empty">No live agents in this category yet.</div>
+          <ShelfEmpty degraded={s.degraded}>No live agents in this category yet.</ShelfEmpty>
         )}
         <p className="note" style={{ marginTop: 18 }}>
           Ranked by on-chain reputation (total score, then feedback) from the ERC-8004 registry via

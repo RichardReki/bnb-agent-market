@@ -1,6 +1,7 @@
 import { CATEGORIES } from '@/lib/categories';
 import { shelf, globalStats, topAgents } from '@/lib/scan';
 import { AgentCard } from '@/components/AgentCard';
+import { ShelfEmpty } from '@/components/ShelfEmpty';
 
 // Server component — all data is fetched server-side from the live 8004scan API. The landing IS the
 // product thesis: not a big number, but the four category shelves, each already populated with real
@@ -15,7 +16,7 @@ export default async function Home() {
     Promise.all(
       CATEGORIES.map(async (c) => {
         const s = await shelf(c.query, { limit: 4 });
-        return { cat: c, agents: s.agents, count: s.total };
+        return { cat: c, agents: s.agents, count: s.total, degraded: s.degraded };
       }),
     ),
     topAgents(4),
@@ -96,7 +97,7 @@ export default async function Home() {
         </section>
       ) : null}
 
-      {shelves.map(({ cat, agents, count }) => (
+      {shelves.map(({ cat, agents, count, degraded }) => (
         <section className="shelf" key={cat.key}>
           <div className="shelf-head">
             <span className="dot" style={{ background: cat.accent }} />
@@ -114,7 +115,7 @@ export default async function Home() {
               ))}
             </div>
           ) : (
-            <div className="empty">No live agents in this category yet.</div>
+            <ShelfEmpty degraded={degraded}>No live agents in this category yet.</ShelfEmpty>
           )}
         </section>
       ))}

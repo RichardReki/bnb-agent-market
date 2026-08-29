@@ -205,3 +205,6 @@ footer { border-top: 1px solid var(--line); margin-top: 60px; padding: 22px 0 60
 .pager-btn.is-off { opacity: 0.32; }
 .pager-btn.is-off:hover { color: var(--muted); border-color: var(--line); }
 .pager-gap { color: var(--faint); font-family: var(--mono); font-size: 12.5px; padding: 0 2px; }
+
+/* a shelf that is empty because we could not reach the registry, not because BSC has nothing */
+.empty.is-degraded { color: var(--gold); border: 1px dashed var(--gold-dim); border-radius: 9px; padding: 16px 18px; line-height: 1.6; max-width: 62ch; }

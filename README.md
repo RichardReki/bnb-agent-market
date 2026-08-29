@@ -120,6 +120,12 @@ npm run build
 No environment variables are required — the site builds and runs against the public API.
 `SCAN_API_KEY` is optional and only raises the rate limit.
 
+The public tier allows **30 requests/minute** (measured — the 429 body reports `limit_value: 30`).
+A request that hits it waits out `retry-after` once and retries; if it still fails, the shelf says
+so in those words rather than rendering "no agents in this category", which would be the site
+misreporting its own data source. Verified by exhausting the real limit and loading an uncached
+page.
+
 Registering an agent (operator-side, needs a funded BSC key):
 
 ```bash

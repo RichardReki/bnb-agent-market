@@ -1,5 +1,6 @@
 import { shelf, type Shelf } from '@/lib/scan';
 import { AgentCard } from '@/components/AgentCard';
+import { ShelfEmpty } from '@/components/ShelfEmpty';
 import { Pagination, PAGE_SIZE, parsePage } from '@/components/Pagination';
 
 export const revalidate = 30;
@@ -54,7 +55,7 @@ export default async function SearchPage({ searchParams }: { searchParams: { q?:
             />
           </>
         ) : q ? (
-          <div className="empty">No agents matched “{q}”. Try a broader term, or browse by category.</div>
+          <ShelfEmpty degraded={s.degraded}>No agents matched “{q}”. Try a broader term, or browse by category.</ShelfEmpty>
         ) : (
           <div className="empty">Enter a search above.</div>
         )}
