@@ -117,8 +117,10 @@ export interface Shelf {
   total: number;
 }
 
-/// A category's agents on BSC (best first) AND its total count, in ONE call — the /agents response
-/// carries `items` + `total` together, so the landing needs four requests, not eight.
+/// One page of agents matching `query` on BSC (best first) AND the total count, in ONE call — the
+/// /agents response carries `items` + `total` together, so the landing needs four requests, not
+/// eight. A category shelf and a free-text search are the same request with a different term, so
+/// this backs both; `offset` is what lets the browse pages page through the full total.
 export async function shelf(query: string, opts: Query = {}): Promise<Shelf> {
   const j = (await get('/agents', {
     chain_id: BSC_CHAIN_ID,
@@ -154,23 +156,6 @@ export async function globalStats(): Promise<GlobalStats> {
   } catch {
     return { total_agents: null, daily_new_agents: null, average_feedback_score: null };
   }
-}
-
-/// Free-text search across all BSC agents (any category), best first. Same /agents endpoint, no
-/// category constraint — powers the header search box.
-export async function search(q: string, limit = 40): Promise<Shelf> {
-  const term = q.trim();
-  if (!term) return { agents: [], total: 0 };
-  const j = (await get('/agents', {
-    chain_id: BSC_CHAIN_ID,
-    search: term,
-    is_registered: true,
-    sort_by: 'total_score',
-    sort_order: 'desc',
-    limit,
-  })) as { items?: Agent[]; data?: Agent[]; total?: number };
-  const agents = (j.items ?? j.data ?? []) as Agent[];
-  return { agents, total: j.total ?? agents.length };
 }
 
 /// The cream across every category on BSC — highest on-chain reputation first — for the landing's

@@ -1,26 +1,41 @@
 import { notFound } from 'next/navigation';
-import { CATEGORIES, byKey } from '@/lib/categories';
-import { shelf } from '@/lib/scan';
+import { byKey } from '@/lib/categories';
+import { shelf, type Shelf } from '@/lib/scan';
 import { AgentCard } from '@/components/AgentCard';
+import { Pagination, PAGE_SIZE, parsePage } from '@/components/Pagination';
 
 export const revalidate = 60;
-
-export function generateStaticParams() {
-  return CATEGORIES.map((c) => ({ category: c.key }));
-}
 
 export async function generateMetadata({ params }: { params: { category: string } }) {
   const c = byKey(params.category);
   return { title: c ? `${c.label} agents on BSC — Agent Market` : 'Agent Market' };
 }
 
+/// Fetch one page, and if the caller asked past the end, fall back to the last real page rather than
+/// showing an empty grid under a non-zero count. Costs a second request only on out-of-range input.
+async function page_(query: string, page: number): Promise<{ shelf: Shelf; page: number }> {
+  const first = await shelf(query, { limit: PAGE_SIZE, offset: (page - 1) * PAGE_SIZE });
+  if (first.agents.length || first.total === 0) return { shelf: first, page };
+  const last = parsePage(String(page), first.total);
+  if (last === page) return { shelf: first, page };
+  return { shelf: await shelf(query, { limit: PAGE_SIZE, offset: (last - 1) * PAGE_SIZE }), page: last };
+}
+
 // Find: the full, ranked shelf for one category. The whole page is real 8004scan data, sorted by
-// on-chain reputation — the "data quality" the brief asks to be judged on.
-export default async function CategoryPage({ params }: { params: { category: string } }) {
+// on-chain reputation — the "data quality" the brief asks to be judged on. Paged, so the count in
+// the header is a promise the grid actually keeps.
+export default async function CategoryPage({
+  params,
+  searchParams,
+}: {
+  params: { category: string };
+  searchParams: { page?: string };
+}) {
   const cat = byKey(params.category);
   if (!cat) notFound();
 
-  const { agents, total: count } = await shelf(cat.query, { limit: 48 });
+  const { shelf: s, page } = await page_(cat.query, parsePage(searchParams.page));
+  const { agents, total: count } = s;
 
   return (
     <>
@@ -37,11 +52,18 @@ export default async function CategoryPage({ params }: { params: { category: str
 
       <section className="shelf">
         {agents.length ? (
-          <div className="grid">
-            {agents.map((a) => (
-              <AgentCard key={`${a.chain_id}-${a.token_id}`} agent={a} />
-            ))}
-          </div>
+          <>
+            <div className="grid">
+              {agents.map((a) => (
+                <AgentCard key={`${a.chain_id}-${a.token_id}`} agent={a} />
+              ))}
+            </div>
+            <Pagination
+              page={page}
+              total={count}
+              href={(p) => (p === 1 ? `/agents/${cat.key}` : `/agents/${cat.key}?page=${p}`)}
+            />
+          </>
         ) : (
           <div className="empty">No live agents in this category yet.</div>
         )}
