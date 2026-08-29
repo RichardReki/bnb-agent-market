@@ -12,24 +12,18 @@ import { buildMetadata } from '../lib/registration.js';
 // because between an agent's decision and its transaction landing the position may have already
 // moved — is what this agent brings to BSC lending markets.
 
-// The registration is irreversible: the agentURI is an inline base64 data URI, written once into
-// registry storage and never updatable. A wrong endpoint here is a permanently dead service link on
-// an agent whose score is dominated by the service dimension — so there is no safe default. Refusing
-// to build without the deployed URL is cheaper than burning a token_id on a typo.
-const endpoint = process.env.HEALTH_AGENT_ENDPOINT;
-if (!endpoint) {
-  throw new Error(
-    'HEALTH_AGENT_ENDPOINT is not set.\n' +
-      'Set it to the DEPLOYED agent-card URL before registering, e.g.\n' +
-      '  HEALTH_AGENT_ENDPOINT=https://<your-app>.vercel.app/api/agents/health/.well-known/agent-card.json\n' +
-      'Verify it returns 200 with `curl -sI "$HEALTH_AGENT_ENDPOINT"` first — the URI is immutable once registered.',
-  );
-}
+// Everything the registration points at lives on one host, so it is named once. The agentURI is an
+// inline base64 data URI: written once into registry storage, never updatable. A URL that is wrong
+// or dead here cannot be corrected on that token — which is why register.mts fetches both of these
+// before it will spend gas, and why the default is a domain we have actually deployed and checked
+// rather than a placeholder.
+const SITE = (process.env.AGENT_SITE_URL ?? 'https://bnb-agent-market-black.vercel.app').replace(/\/+$/, '');
+
 // https in production; plain http is allowed only against a local host so the whole registration
 // path can be rehearsed against `next start` before the site is deployed.
-const localhost = /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?\//.test(endpoint);
-if (!/^https:\/\//.test(endpoint) && !localhost) {
-  throw new Error(`HEALTH_AGENT_ENDPOINT must be an https:// URL (or http://localhost for a rehearsal), got: ${endpoint}`);
+const localhost = /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(SITE);
+if (!/^https:\/\//.test(SITE) && !localhost) {
+  throw new Error(`AGENT_SITE_URL must be an https:// origin (or http://localhost for a rehearsal), got: ${SITE}`);
 }
 
 export const HEALTH_FACTOR_AGENT = buildMetadata({
@@ -40,12 +34,16 @@ export const HEALTH_FACTOR_AGENT = buildMetadata({
     'how far the market must move to get there — then repays or tops up collateral while there is ' +
     'still time. Every rescue re-reads the health factor on-chain at execution time, so a position ' +
     'that recovered on its own is never touched.',
+  // 8004scan re-hosts whatever this points at onto its own media CDN, so it has to be reachable at
+  // index time. Most registered agents leave it empty and render as a blank tile; having one is
+  // cheap visual ground on every shelf the agent appears on, including ours.
+  image: `${SITE}/agent-sentinel.png`,
   services: [
     {
       name: 'A2A',
       // 8004scan health-checks this endpoint, and the service dimension carries the most weight in
       // the reputation score — an unreachable card drags the agent down no matter how good it is.
-      endpoint,
+      endpoint: `${SITE}/api/agents/health/.well-known/agent-card.json`,
       version: '0.3.0',
     },
   ],

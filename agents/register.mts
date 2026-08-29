@@ -101,6 +101,38 @@ if (problem) {
   console.log('Endpoint   ✓ live, serves a parseable agent card');
 }
 
+// The image lives in the same immutable URI and 8004scan re-hosts it at index time, so a dead image
+// URL is just as permanent as a dead endpoint. Same check, same reasoning.
+async function checkImage(url: string): Promise<string | null> {
+  if (!url) return 'no image set';
+  let res: Response;
+  try {
+    res = await fetch(url);
+  } catch (e) {
+    return `unreachable: ${(e as Error).message}`;
+  }
+  if (!res.ok) return `HTTP ${res.status} ${res.statusText}`;
+  const ct = res.headers.get('content-type') ?? '';
+  if (!ct.startsWith('image/')) return `content-type is "${ct}", not an image`;
+  return null;
+}
+
+const imageProblem = await checkImage(meta.image);
+if (imageProblem) {
+  if (!dry) {
+    throw new Error(
+      [
+        `image check failed — ${imageProblem}`,
+        `  ${meta.image}`,
+        'Refusing to register: the image URL is baked into the immutable agentURI.',
+      ].join('\n'),
+    );
+  }
+  console.log(`Image      ⚠ ${imageProblem} (tolerated in --dry)`);
+} else {
+  console.log('Image      ✓ live');
+}
+
 if (dry) {
   console.log('\n--dry: nothing sent. Metadata that would go on-chain:\n');
   console.log(JSON.stringify(decoded, null, 2));
