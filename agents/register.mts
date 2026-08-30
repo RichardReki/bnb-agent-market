@@ -11,7 +11,7 @@
 // Registration is permissionless and 8004scan auto-indexes the Registered event — there is no
 // listing step, no approval. Once this lands, the agent shows up on the marketplace's category
 // shelf like any other; filling its token id into lib/ours.ts is what badges it as ours.
-import { createWalletClient, createPublicClient, http, encodeFunctionData } from 'viem';
+import { createWalletClient, createPublicClient, http, fallback, encodeFunctionData } from 'viem';
 import { bsc, bscTestnet } from 'viem/chains';
 import { privateKeyToAccount } from 'viem/accounts';
 import { REGISTRY, REGISTER_ABI, toAgentURI, fromAgentURI } from './lib/registration.js';
@@ -167,10 +167,31 @@ if (dry) {
 
 const pk = process.env.PRIVATE_KEY as `0x${string}`;
 
+// viem's default transport for BSC is a public-good RPC that rate-limits hard — it returned 429
+// mid-run while we were only reading balances. A 429 on a read is a retry; a 429 between broadcast
+// and receipt leaves you not knowing whether a mainnet transaction landed. So the endpoints are
+// named explicitly, with a fallback: the first that answers wins, and one provider having a bad
+// minute does not decide the outcome of a transaction you cannot repeat.
+const RPCS: Record<number, string[]> = {
+  56: [
+    'https://bsc-dataseed.bnbchain.org',
+    'https://bsc-dataseed1.defibit.io',
+    'https://bsc-dataseed1.ninicoin.io',
+  ],
+  97: [
+    'https://data-seed-prebsc-1-s1.bnbchain.org:8545',
+    'https://data-seed-prebsc-2-s1.bnbchain.org:8545',
+  ],
+};
+/// RPC_URL overrides everything, for a private endpoint or a local node.
+const transport = process.env.RPC_URL
+  ? http(process.env.RPC_URL)
+  : fallback((RPCS[chainId] ?? []).map((u) => http(u)));
+
 const chain = chainId === 56 ? bsc : bscTestnet;
 const account = privateKeyToAccount(pk);
-const wallet = createWalletClient({ account, chain, transport: http() });
-const pub = createPublicClient({ chain, transport: http() });
+const wallet = createWalletClient({ account, chain, transport });
+const pub = createPublicClient({ chain, transport });
 
 const balance = await pub.getBalance({ address: account.address });
 console.log(`\nSender     ${account.address}`);
