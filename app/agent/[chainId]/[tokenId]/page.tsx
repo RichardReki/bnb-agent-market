@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation';
 import { agentDetail, scoreOf, reputationDimensions, type AgentService } from '@/lib/scan';
 import { short, ago, bscscanAddr, bscscanTx } from '@/lib/format';
 import { HirePanel } from '@/components/HirePanel';
+import { probe, type EndpointStatus } from '@/lib/endpoint';
 
 export const revalidate = 20;
 
@@ -24,6 +25,13 @@ export default async function AgentPage({ params }: { params: { chainId: string;
   const services: [string, AgentService][] = a.services
     ? (Object.entries(a.services).filter(([, v]) => v && v.endpoint) as [string, AgentService][])
     : [];
+
+  // Ask each endpoint whether it is actually there, rather than rendering an Activate button over a
+  // URL nobody has checked. A third of the top-ranked agents on BSC fail this, and the registry does
+  // not say so — see lib/endpoint.ts. Runs in parallel and is cached, so the page costs one extra
+  // round trip at most.
+  const statuses: EndpointStatus[] = await Promise.all(services.map(([, v]) => probe(v.endpoint)));
+  const reachable = statuses.filter((s) => s.kind === 'live').length;
   const dims = reputationDimensions(a);
 
   return (
@@ -116,9 +124,17 @@ export default async function AgentPage({ params }: { params: { chainId: string;
 
       {/* Activate */}
       <section className="activate">
-        <h3>Hire this agent</h3>
+        <h3>
+          Hire this agent
+          {services.length ? (
+            <span className="svc-tally mono">
+              {reachable} of {services.length} endpoint{services.length === 1 ? '' : 's'} responding
+            </span>
+          ) : null}
+        </h3>
         <HirePanel
           services={services}
+          statuses={statuses}
           x402={!!a.x402_supported}
           agentWallet={a.agent_wallet}
           protocols={a.supported_protocols ?? []}
