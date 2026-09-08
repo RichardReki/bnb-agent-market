@@ -17,19 +17,19 @@ no fixture file, and no mock: if the registry is empty tomorrow, so is this site
 |---|---|---|
 | **Land** | [`/`](https://bnb-agent-market-black.vercel.app) | Live registry stats, a proportional band showing how the four judged categories actually divide, a top-rated shelf, then all four category shelves. |
 | **Find** | [`/agents/yield`](https://bnb-agent-market-black.vercel.app/agents/yield) · [`/search?q=liquidation`](https://bnb-agent-market-black.vercel.app/search?q=liquidation) | Every agent in a category, ranked by on-chain reputation, **paged through in full** — the header count is a number the grid keeps. |
-| **Understand** | [`/agent/56/317281`](https://bnb-agent-market-black.vercel.app/agent/56/317281) | Liveness (endpoint verification, health check timestamps), the reputation score broken into its weighted dimensions, and on-chain provenance — creation tx, block, owner, agent wallet — each linking to BscScan. |
+| **Understand** | [`/agent/56/269228`](https://bnb-agent-market-black.vercel.app/agent/56/269228) | Liveness (endpoint verification, health check timestamps), the reputation score broken into its weighted dimensions, and on-chain provenance — creation tx, block, owner, agent wallet — each linking to BscScan. |
 | **Hire** | same page | Connect wallet → network guard → open the agent's real service endpoint from its registry record. |
 
 ### Four categories, equal depth
 
-Counts are rendered live; these were the values on 2026-08-29:
+Counts are rendered live; these were the values on 2026-09-08:
 
 | Category | Live on BSC |
 |---|---|
-| Rebalancing | 43 |
-| Grid Trading | 13 |
-| Yield Optimisation | 225 |
-| Health Factor Monitoring | 16 |
+| Rebalancing | 57 |
+| Grid Trading | 20 |
+| Yield Optimisation | 305 |
+| Health Factor Monitoring | 29 |
 
 The brief scores *agent diversity* — all four surfaced with equal depth, not one category padded out.
 Each shelf is the same component over the same live query, so depth is a property of the registry,
@@ -46,7 +46,8 @@ Stated plainly, because a marketplace that overstates itself is the failure mode
 - Paging over the complete result set (verified against out-of-range and non-numeric input).
 - Wallet connect, BSC network guard, and activation links that open each agent's **own** endpoint as
   recorded in the registry.
-- Our own agent's registration, built by decoding a real registration transaction (see below).
+- The registration path, built by decoding a real registration transaction (see below) — the write
+  side of ERC-8004, understood and exercised, though nothing of ours is listed here.
 
 **Not wired, and not claimed to be:**
 - **No on-chain payment.** "Hire" opens the agent's service; it does not settle anything. x402 and
@@ -57,22 +58,25 @@ Stated plainly, because a marketplace that overstates itself is the failure mode
 
 ---
 
-## Our own agent
+## Why nothing here is ours
 
-Most entrants list other people's agents. We also register one, in the category where we have
-actually shipped: **Sentinel · Health Factor Guard**, watching Venus and Aave positions on BSC and
-acting before liquidation. It ports [LIFELINE](https://github.com/RichardReki/lifeline), an Aave v3
-liquidation-rescue agent that won a bounty at the KeeperHub hackathon; its core idea — re-read the
-health factor **on-chain at execution time**, because between an agent's decision and its transaction
-landing the position may already have moved — is what carries over.
+An earlier plan had us registering our own agents and badging them on their shelves. The code for it
+existed and is gone, deliberately.
 
-Its A2A card is served by this same site, so the agent is live the moment the site deploys:
-[`/api/agents/health/.well-known/agent-card.json`](https://bnb-agent-market-black.vercel.app/api/agents/health/.well-known/agent-card.json)
+The prize this is built for is "official adoption as the BNB Agent Studio marketplace, the canonical
+front door for every agent on BSC". A canonical front door whose operator inserts their own agent and
+gives it a distinguishing mark is not neutral, and neutrality is most of what makes a front door
+worth adopting. The instinct is wrong at any scale, and at this scale it is also pointless: there are
+over four hundred agents in the four categories already, so one more changes nothing except who owns
+it.
 
-> **Status: registration prepared, not yet on chain.** `agents/register.mts --dry` passes end to end
-> against BSC mainnet — the encoding round-trips, the endpoint and image both return 200, and the
-> registry accepts the calldata under gas estimation (932,111 gas). The token id lands here and in
-> `lib/ours.ts` when the transaction is sent.
+What survives is the part that was actually worth having. `agents/` contains a complete, working
+registration path — metadata built to the live on-chain schema, an A2A card served from this site at
+[`/api/agents/health/.well-known/agent-card.json`](https://bnb-agent-market-black.vercel.app/api/agents/health/.well-known/agent-card.json),
+and `register.mts`, which refuses to spend gas until it has verified the encoding round-trips, the
+service endpoint answers, the image resolves, and the chain is the one the marketplace actually
+lists. Understanding the write side is what makes the read side trustworthy; listing ourselves was
+never the part that demonstrated it.
 
 ### The registration was built from chain, not from docs
 
@@ -97,11 +101,11 @@ app/                     Next.js 14 App Router, server components — data never
   agents/[category]/     paged category browse
   agent/[chain]/[token]/ the Understand page
   search/                cross-category paged search
-  api/agents/health/…    our agent's live A2A card
+  api/agents/health/…    a live A2A card, served for the registration path in agents/
 lib/scan.ts              the only 8004scan caller: typed, server-side, one request builder
 lib/categories.ts        the four judged categories and their registry queries
 components/              AgentCard, Pagination, HirePanel (the one client component)
-agents/                  our own agent: metadata, registration, encoding verified against chain
+agents/                  the ERC-8004 registration path, decoded from a real on-chain transaction
 ```
 
 `lib/scan.ts` is server-only on purpose: the API can block browser origins, and the optional Pro API
@@ -120,11 +124,30 @@ npm run build
 No environment variables are required — the site builds and runs against the public API.
 `SCAN_API_KEY` is optional and only raises the rate limit.
 
-The public tier allows **30 requests/minute** (measured — the 429 body reports `limit_value: 30`).
-A request that hits it waits out `retry-after` once and retries; if it still fails, the shelf says
-so in those words rather than rendering "no agents in this category", which would be the site
-misreporting its own data source. Verified by exhausting the real limit and loading an uncached
-page.
+### Surviving the data source
+
+8004scan is not dependable, and this is judged over a two-week window. Measured over one afternoon it
+returned `500 DATABASE_ERROR` for ten minutes, took 27 seconds on the list endpoint, timed out
+entirely on `/stats/global`, and 500'd on search. Anonymous access is also capped at **30 requests a
+minute and 1,000 a day** — the daily figure being the one that decides whether a site survives people
+actually browsing it.
+
+Four layers, each of which says what it is doing:
+
+1. A request that hits the rate limit waits out `retry-after` once. Everything is bounded at eight
+   seconds, because a page that answers in 27 has already lost the visitor.
+2. Next's own data cache, which absorbs most short outages on a warm instance.
+3. The last good response this process saw, served with its age attached.
+4. **`data/snapshot.json`**, committed with the source, so even a cold instance with an unreachable
+   upstream renders a full page of real BSC agents — and search still works, against the agents in it.
+
+What none of the layers do is guess. An empty category and an unreachable registry are different
+claims and are worded differently; a registry that answers "no such agent" produces a 404 while a
+registry that does not answer produces a page saying so; and data that is not current always says how
+old it is. Verified by pointing the app at a dead port from a cold start: every category page renders
+in under 60ms with a full shelf, correctly labelled.
+
+Refresh the floor with `node tools/snapshot.mjs`.
 
 Registering an agent (operator-side, needs a funded BSC key):
 
