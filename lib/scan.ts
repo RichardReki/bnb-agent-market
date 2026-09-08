@@ -29,7 +29,30 @@ const snapshot = snapshotJson as unknown as Snapshot;
 function snapshotShelf(query: string, offset: number): Shelf | null {
   if (offset > 0) return null;
   const hit = Object.values(snapshot.shelves).find((v) => v.query === query);
-  return hit ? { agents: hit.items, total: hit.total, staleAt: snapshot.capturedAt, fromSnapshot: true } : null;
+  if (hit) return { agents: hit.items, total: hit.total, staleAt: snapshot.capturedAt, fromSnapshot: true };
+
+  // A free-text search cannot be pre-captured, but the agents already in the snapshot can still be
+  // searched. It is a smaller haystack than the registry and the result says so — which beats "we
+  // could not reach the registry" for a visitor who just wants to find something, and is the
+  // difference between Find degrading and Find disappearing.
+  const terms = query.toLowerCase().split(/\s+/).filter(Boolean);
+  if (!terms.length) return null;
+  const seen = new Set<string>();
+  const hits: Agent[] = [];
+  for (const shelfData of Object.values(snapshot.shelves)) {
+    for (const a of shelfData.items) {
+      const id = String(a.token_id);
+      if (seen.has(id)) continue;
+      const hay = `${a.name ?? ''} ${a.description ?? ''}`.toLowerCase();
+      if (terms.every((t) => hay.includes(t))) {
+        seen.add(id);
+        hits.push(a);
+      }
+    }
+  }
+  return hits.length
+    ? { agents: hits, total: hits.length, staleAt: snapshot.capturedAt, fromSnapshot: true }
+    : null;
 }
 
 // The API key, and why it matters more than it looks.
