@@ -35,7 +35,15 @@ function snapshotShelf(query: string, offset: number): Shelf | null {
   // searched. It is a smaller haystack than the registry and the result says so — which beats "we
   // could not reach the registry" for a visitor who just wants to find something, and is the
   // difference between Find degrading and Find disappearing.
-  const terms = query.toLowerCase().split(/\s+/).filter(Boolean);
+  // Matched on a stem rather than the whole word, because "rebalance" is not a substring of
+  // "rebalancing" and a visitor searching the obvious term should not get nothing. Trimming up to
+  // three trailing characters covers the -ing/-ed/-s/-e endings that separate a query from the text
+  // it is looking for, while keeping at least five characters so short terms stay precise.
+  const terms = query
+    .toLowerCase()
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((t) => (t.length >= 6 ? t.slice(0, Math.max(5, t.length - 3)) : t));
   if (!terms.length) return null;
   const seen = new Set<string>();
   const hits: Agent[] = [];
