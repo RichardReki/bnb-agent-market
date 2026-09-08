@@ -10,7 +10,15 @@
 const BASE = process.env.SCAN_BASE ?? 'https://api.8004scan.io/api/v1';
 export const BSC_CHAIN_ID = 56;
 
-// Optional Pro key (500 req/min). Set SCAN_API_KEY in the environment once granted.
+// The API key, and why it matters more than it looks.
+//
+// 8004scan's published tiers: anonymous is 30 requests/minute and **1,000 per day**; a free key
+// raises that to 600/minute and 100,000/day. The per-minute figure is what shows up in a 429 during
+// development, but the daily cap is the one that decides whether this site works during a two-week
+// judging window — a page render costs several calls, and ISR keeps refetching. Without a key the
+// whole site shares a thousand requests a day.
+//
+// Server-side only, never shipped to the browser.
 const API_KEY = process.env.SCAN_API_KEY;
 
 export interface Agent {
