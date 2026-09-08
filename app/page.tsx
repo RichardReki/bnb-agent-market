@@ -78,6 +78,11 @@ export default async function Home() {
               </a>
             ))}
           </div>
+          <p className="dist-caption">
+            The shape is the registry, not our ranking: BSC really is mostly yield agents today. All
+            four categories get the same shelf below, the same ranking and the same depth — the bar
+            is what is out there, not what we think matters.
+          </p>
         </div>
       </section>
 

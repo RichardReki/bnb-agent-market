@@ -217,3 +217,58 @@ footer { border-top: 1px solid var(--line); margin-top: 60px; padding: 22px 0 60
 
 /* data that is real but not current, because the registry is down */
 .stale-notice { color: var(--gold); border: 1px dashed var(--gold-dim); border-radius: 9px; padding: 12px 16px; margin: 18px 0 4px; font-size: 13px; line-height: 1.6; max-width: 74ch; }
+
+/* ---- fixes from a 390px walkthrough --------------------------------------------------------- */
+
+/* 1. The shelf head was a single baseline row: at 390px the title wrapped word by word and the
+      blurb was squeezed into a column beside it. Below 720px it stacks instead, and the blurb —
+      which is context, not navigation — drops to its own line at full width. */
+@media (max-width: 720px) {
+  .shelf-head { flex-wrap: wrap; align-items: center; gap: 8px 10px; }
+  .shelf-head h2 { font-size: 16px; }
+  .shelf-head .blurb { margin-left: 0; text-align: left; order: 3; flex-basis: 100%; max-width: none; font-size: 12.5px; }
+  .shelf-head a.more { margin-left: auto; }
+}
+
+/* 2. "1 of 2 endpoints responding" is the one thing this marketplace knows that the registry does
+      not, and it was 12px of faint grey trailing a heading — read as a caption, skipped on a phone.
+      It is a status, so it now looks like one, and it changes colour on the answer. */
+.svc-tally {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-family: var(--mono); font-size: 12.5px; font-weight: 500; letter-spacing: 0;
+  margin-left: 12px; padding: 5px 10px; border-radius: 999px; vertical-align: middle;
+  border: 1px solid var(--line); background: var(--panel); color: var(--muted);
+}
+.svc-tally::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+.svc-tally.is-live { color: var(--ok); border-color: color-mix(in srgb, var(--ok) 40%, var(--line)); }
+.svc-tally.is-partial { color: var(--gold); border-color: var(--gold-dim); }
+.svc-tally.is-down { color: var(--gold); border-color: var(--gold-dim); }
+@media (max-width: 640px) {
+  .activate h3 { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+  .svc-tally { margin-left: 0; }
+}
+
+/* 3. On a phone the Activate panel sat about 1,250px down, behind the whole reputation breakdown —
+      the last step of the judged journey, reachable only after scrolling past everything that
+      explains it. On narrow screens it moves directly under the header. Order only; the DOM keeps
+      its reading sequence, which is the one screen readers and search engines follow. */
+.detail-page { display: flex; flex-direction: column; }
+@media (max-width: 860px) {
+  .detail-page > .detail-hero { order: 1; }
+  .detail-page > .activate { order: 2; }
+  .detail-page > .panels { order: 3; }
+  .detail-page > .breakdown { order: 4; }
+  .detail-page > .provenance { order: 5; }
+  .detail-page > .stale-notice { order: 0; }
+}
+
+/* 4. A bare "30.4 SCORE" is unreadable as good or bad. The scale is stated where the number is. */
+.scale-note { color: var(--faint); font-size: 12px; line-height: 1.55; margin-top: 14px; max-width: 78ch; }
+.scale-note b { color: var(--muted); font-weight: 600; }
+
+/* 5. The distribution band is proportional and honest — the registry really is three-quarters yield
+      — but at 5% the grid segment read as "this category does not matter", against a brief that
+      weights all four equally. A floor keeps every category legible as a target, and the caption
+      says what the shape means so the picture cannot be misread as our priority. */
+.dist-seg { min-width: 9%; }
+.dist-caption { color: var(--faint); font-size: 12px; margin-top: 10px; line-height: 1.55; max-width: 76ch; }

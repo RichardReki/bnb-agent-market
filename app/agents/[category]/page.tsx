@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation';
 import { byKey } from '@/lib/categories';
 import { shelf, type Shelf } from '@/lib/scan';
 import { AgentCard } from '@/components/AgentCard';
+import { ScoreScale } from '@/components/ScoreScale';
 import { ShelfEmpty } from '@/components/ShelfEmpty';
 import { StaleNotice } from '@/components/StaleNotice';
 import { Pagination, PAGE_SIZE, parsePage } from '@/components/Pagination';
@@ -56,6 +57,7 @@ export default async function CategoryPage({
         <StaleNotice at={s.staleAt} fromSnapshot={s.fromSnapshot} />
         {agents.length ? (
           <>
+            <ScoreScale agents={agents} />
             <div className="grid">
               {agents.map((a) => (
                 <AgentCard key={`${a.chain_id}-${a.token_id}`} agent={a} />
@@ -72,8 +74,8 @@ export default async function CategoryPage({
           <ShelfEmpty degraded={s.degraded}>No live agents in this category yet.</ShelfEmpty>
         )}
         <p className="note" style={{ marginTop: 18 }}>
-          Ranked by on-chain reputation (total score, then feedback) from the ERC-8004 registry via
-          8004scan. Verified badges reflect on-chain verification.
+          Ranked by on-chain reputation from the ERC-8004 registry via 8004scan. Verified badges
+          reflect on-chain verification.
         </p>
       </section>
     </>

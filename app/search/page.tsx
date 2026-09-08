@@ -1,5 +1,6 @@
 import { shelf, type Shelf } from '@/lib/scan';
 import { AgentCard } from '@/components/AgentCard';
+import { ScoreScale } from '@/components/ScoreScale';
 import { ShelfEmpty } from '@/components/ShelfEmpty';
 import { StaleNotice } from '@/components/StaleNotice';
 import { Pagination, PAGE_SIZE, parsePage } from '@/components/Pagination';
@@ -45,6 +46,7 @@ export default async function SearchPage({ searchParams }: { searchParams: { q?:
         <StaleNotice at={s.staleAt} fromSnapshot={s.fromSnapshot} />
         {q && agents.length ? (
           <>
+            <ScoreScale agents={agents} />
             <div className="grid">
               {agents.map((a) => (
                 <AgentCard key={`${a.chain_id}-${a.token_id}`} agent={a} />

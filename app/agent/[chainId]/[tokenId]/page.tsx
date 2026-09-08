@@ -44,6 +44,7 @@ export default async function AgentPage({ params }: { params: { chainId: string;
 
   return (
     <>
+      <div className="detail-page">
       <StaleNotice at={result.staleAt} fromSnapshot={result.fromSnapshot} />
       <section className="detail-hero">
         <a className="back" href="/">
@@ -136,8 +137,10 @@ export default async function AgentPage({ params }: { params: { chainId: string;
         <h3>
           Hire this agent
           {services.length ? (
-            <span className="svc-tally mono">
-              {reachable} of {services.length} endpoint{services.length === 1 ? '' : 's'} responding
+            <span
+              className={`svc-tally ${reachable === services.length ? 'is-live' : reachable ? 'is-partial' : 'is-down'}`}
+            >
+              {`${reachable} of ${services.length} endpoint${services.length === 1 ? '' : 's'} responding`}
             </span>
           ) : null}
         </h3>
@@ -164,6 +167,7 @@ export default async function AgentPage({ params }: { params: { chainId: string;
           provenance links resolve on BscScan.
         </p>
       </section>
+      </div>
     </>
   );
 }
