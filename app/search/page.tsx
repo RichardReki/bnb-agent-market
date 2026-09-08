@@ -1,6 +1,7 @@
 import { shelf, type Shelf } from '@/lib/scan';
 import { AgentCard } from '@/components/AgentCard';
 import { ShelfEmpty } from '@/components/ShelfEmpty';
+import { StaleNotice } from '@/components/StaleNotice';
 import { Pagination, PAGE_SIZE, parsePage } from '@/components/Pagination';
 
 export const revalidate = 30;
@@ -41,6 +42,7 @@ export default async function SearchPage({ searchParams }: { searchParams: { q?:
       </section>
 
       <section className="shelf">
+        <StaleNotice at={s.staleAt} />
         {q && agents.length ? (
           <>
             <div className="grid">

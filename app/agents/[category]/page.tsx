@@ -3,6 +3,7 @@ import { byKey } from '@/lib/categories';
 import { shelf, type Shelf } from '@/lib/scan';
 import { AgentCard } from '@/components/AgentCard';
 import { ShelfEmpty } from '@/components/ShelfEmpty';
+import { StaleNotice } from '@/components/StaleNotice';
 import { Pagination, PAGE_SIZE, parsePage } from '@/components/Pagination';
 
 export const revalidate = 60;
@@ -52,6 +53,7 @@ export default async function CategoryPage({
       </section>
 
       <section className="shelf">
+        <StaleNotice at={s.staleAt} />
         {agents.length ? (
           <>
             <div className="grid">

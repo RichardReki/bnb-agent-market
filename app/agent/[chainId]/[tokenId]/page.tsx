@@ -3,6 +3,7 @@ import { agentDetail, scoreOf, reputationDimensions, type AgentService } from '@
 import { short, ago, bscscanAddr, bscscanTx } from '@/lib/format';
 import { HirePanel } from '@/components/HirePanel';
 import { probe, type EndpointStatus } from '@/lib/endpoint';
+import { StaleNotice } from '@/components/StaleNotice';
 
 export const revalidate = 20;
 
@@ -43,6 +44,7 @@ export default async function AgentPage({ params }: { params: { chainId: string;
 
   return (
     <>
+      <StaleNotice at={result.staleAt} />
       <section className="detail-hero">
         <a className="back" href="/">
           ← all agents

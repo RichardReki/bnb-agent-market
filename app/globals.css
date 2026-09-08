@@ -214,3 +214,6 @@ footer { border-top: 1px solid var(--line); margin-top: 60px; padding: 22px 0 60
 .svc.is-down .svc-ep { text-decoration: line-through; text-decoration-color: var(--faint); }
 .svc-down { font-size: 12px; color: var(--gold); border: 1px dashed var(--gold-dim); border-radius: 7px; padding: 7px 10px; line-height: 1.4; max-width: 46ch; }
 .svc-tally { font-family: var(--mono); font-size: 12px; font-weight: 400; color: var(--faint); margin-left: 10px; letter-spacing: 0; }
+
+/* data that is real but not current, because the registry is down */
+.stale-notice { color: var(--gold); border: 1px dashed var(--gold-dim); border-radius: 9px; padding: 12px 16px; margin: 18px 0 4px; font-size: 13px; line-height: 1.6; max-width: 74ch; }

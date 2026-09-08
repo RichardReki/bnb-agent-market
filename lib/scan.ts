@@ -5,7 +5,9 @@
 //
 // Fields mirror what the live /agents response actually returns; nothing here is assumed.
 
-const BASE = 'https://api.8004scan.io/api/v1';
+// Overridable so the outage path can actually be exercised against a controllable stand-in, rather
+// than only when 8004scan happens to be down. Production leaves it unset.
+const BASE = process.env.SCAN_BASE ?? 'https://api.8004scan.io/api/v1';
 export const BSC_CHAIN_ID = 56;
 
 // Optional Pro key (500 req/min). Set SCAN_API_KEY in the environment once granted.
@@ -109,6 +111,27 @@ class ScanError extends Error {
   }
 }
 
+/// The last successful response for each URL, kept so an outage does not have to mean a blank page.
+///
+/// This upstream is not reliable: while this was being built 8004scan answered 500 DATABASE_ERROR
+/// for ten minutes, and its detail endpoint has taken 27 seconds to respond. Judging runs for two
+/// weeks, so "it was fine when we tested" is not a plan.
+///
+/// In memory on purpose, with its limits stated rather than hidden: a cold serverless instance
+/// starts empty, so this helps a visitor already clicking around and does nothing for the first
+/// request after a deploy. It is a cushion, not a database, and the page always says how old the
+/// data is rather than passing it off as live.
+const lastGood = new Map<string, { json: unknown; at: number }>();
+
+/// Thrown when the live request failed but a previous good answer exists. Carrying the payload on
+/// the error keeps `get`'s return type honest — a caller that ignores this gets no data, rather than
+/// silently receiving something stale it never asked about.
+export class StaleData extends Error {
+  constructor(readonly json: unknown, readonly at: number) {
+    super('serving the last good response');
+  }
+}
+
 /// The upstream rate limit is 30 requests/minute without an API key — measured, not guessed: the
 /// 429 body reports `limit_value: 30, limit_type: "minute"` and the response carries `retry-after`.
 /// Browsing four category shelves and a few agents can reach that during a judging session, so a
@@ -135,15 +158,27 @@ async function get(path: string, params: Record<string, string | number | boolea
       next: { revalidate },
     });
 
-  let res = await send();
-  if (res.status === 429) {
-    // Capped low on purpose: a visitor waiting is worse than a shelf that says why it is empty.
-    const wait = Math.min(Number(res.headers.get('retry-after') ?? 1) * 1000, 2500);
-    await new Promise((r) => setTimeout(r, wait));
-    res = await send();
+  const key = url.toString();
+  try {
+    let res = await send();
+    if (res.status === 429) {
+      // Capped low on purpose: a visitor waiting is worse than a shelf that says why it is empty.
+      const wait = Math.min(Number(res.headers.get('retry-after') ?? 1) * 1000, 2500);
+      await new Promise((r) => setTimeout(r, wait));
+      res = await send();
+    }
+    if (!res.ok) throw new ScanError(res.status, path);
+    const json = await res.json();
+    lastGood.set(key, { json, at: Date.now() });
+    return json;
+  } catch (e) {
+    // Real data with an honest "as of" beats an honest blank. A 404 is excluded deliberately: that
+    // is the registry answering, and serving a cached record over it would be showing an agent that
+    // has since been removed.
+    const cached = e instanceof ScanError && e.status === 404 ? undefined : lastGood.get(key);
+    if (cached) throw new StaleData(cached.json, cached.at);
+    throw e;
   }
-  if (!res.ok) throw new ScanError(res.status, path);
-  return res.json();
 }
 
 export interface Shelf {
@@ -155,6 +190,9 @@ export interface Shelf {
   /// second is true is the site lying about its own data. Never throws, so a bad minute upstream
   /// degrades one shelf instead of returning a 500 to whoever is looking.
   degraded?: boolean;
+  /// When the data being shown was actually fetched, if the live request failed and this is the last
+  /// good answer. Absent means live.
+  staleAt?: number;
 }
 
 /// One page of agents matching `query` on BSC (best first) AND the total count, in ONE call — the
@@ -173,12 +211,18 @@ export async function shelf(query: string, opts: Query = {}): Promise<Shelf> {
       offset: opts.offset ?? 0,
       ...(opts.x402_supported ? { x402_supported: true } : {}),
       ...(opts.has_mcp ? { has_mcp: true } : {}),
-    })) as { items?: Agent[]; data?: Agent[]; total?: number };
-    const agents = (j.items ?? j.data ?? []) as Agent[];
-    return { agents, total: j.total ?? agents.length };
-  } catch {
+    })) as ShelfJson;
+    return unwrapShelf(j);
+  } catch (e) {
+    if (e instanceof StaleData) return { ...unwrapShelf(e.json as ShelfJson), staleAt: e.at };
     return { agents: [], total: 0, degraded: true };
   }
+}
+
+type ShelfJson = { items?: Agent[]; data?: Agent[]; total?: number };
+function unwrapShelf(j: ShelfJson): Shelf {
+  const agents = (j.items ?? j.data ?? []) as Agent[];
+  return { agents, total: j.total ?? agents.length };
 }
 
 /// Why this is not just `AgentDetail | null`.
@@ -190,7 +234,7 @@ export async function shelf(query: string, opts: Query = {}): Promise<Shelf> {
 /// whose whole claim is that it reports the registry faithfully. During judging that is the worst
 /// available failure: a judge following a link we gave them lands on "this agent does not exist".
 export type DetailResult =
-  | { kind: 'ok'; agent: AgentDetail }
+  | { kind: 'ok'; agent: AgentDetail; staleAt?: number }
   | { kind: 'missing' } // the registry says there is no such agent
   | { kind: 'degraded'; status: number | null }; // we could not ask
 
@@ -201,6 +245,10 @@ export async function agentDetail(chainId: number, tokenId: string): Promise<Det
     const rec = ((j as { data?: AgentDetail }).data ?? (j as AgentDetail)) as AgentDetail | undefined;
     return rec ? { kind: 'ok', agent: rec } : { kind: 'missing' };
   } catch (e) {
+    if (e instanceof StaleData) {
+      const rec = ((e.json as { data?: AgentDetail }).data ?? e.json) as AgentDetail | undefined;
+      if (rec) return { kind: 'ok', agent: rec, staleAt: e.at };
+    }
     if (e instanceof ScanError && e.status === 404) return { kind: 'missing' };
     return { kind: 'degraded', status: e instanceof ScanError ? e.status : null };
   }
@@ -211,7 +259,11 @@ export async function globalStats(): Promise<GlobalStats> {
     const j = await get('/stats/global', {}, 300);
     const d = (j as { data?: GlobalStats }).data ?? (j as GlobalStats);
     return d as GlobalStats;
-  } catch {
+  } catch (e) {
+    if (e instanceof StaleData) {
+      const d = (e.json as { data?: GlobalStats }).data ?? (e.json as GlobalStats);
+      if (d) return d as GlobalStats;
+    }
     return { total_agents: null, daily_new_agents: null, average_feedback_score: null };
   }
 }
@@ -228,7 +280,11 @@ export async function topAgents(limit = 8): Promise<Agent[]> {
       limit,
     })) as { items?: Agent[]; data?: Agent[] };
     return (j.items ?? j.data ?? []) as Agent[];
-  } catch {
+  } catch (e) {
+    if (e instanceof StaleData) {
+      const j = e.json as ShelfJson;
+      return (j.items ?? j.data ?? []) as Agent[];
+    }
     // A bonus shelf: the landing already renders nothing when it is empty, so failing quietly here
     // costs a section rather than the page.
     return [];
