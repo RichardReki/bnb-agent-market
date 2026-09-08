@@ -53,7 +53,7 @@ export default async function CategoryPage({
       </section>
 
       <section className="shelf">
-        <StaleNotice at={s.staleAt} />
+        <StaleNotice at={s.staleAt} fromSnapshot={s.fromSnapshot} />
         {agents.length ? (
           <>
             <div className="grid">
@@ -64,6 +64,7 @@ export default async function CategoryPage({
             <Pagination
               page={page}
               total={count}
+              shown={agents.length}
               href={(p) => (p === 1 ? `/agents/${cat.key}` : `/agents/${cat.key}?page=${p}`)}
             />
           </>

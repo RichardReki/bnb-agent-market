@@ -42,7 +42,7 @@ export default async function SearchPage({ searchParams }: { searchParams: { q?:
       </section>
 
       <section className="shelf">
-        <StaleNotice at={s.staleAt} />
+        <StaleNotice at={s.staleAt} fromSnapshot={s.fromSnapshot} />
         {q && agents.length ? (
           <>
             <div className="grid">
@@ -53,6 +53,7 @@ export default async function SearchPage({ searchParams }: { searchParams: { q?:
             <Pagination
               page={page}
               total={total}
+              shown={agents.length}
               href={(p) => `/search?q=${encodeURIComponent(q)}${p === 1 ? '' : `&page=${p}`}`}
             />
           </>

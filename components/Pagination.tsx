@@ -24,16 +24,21 @@ function window_(page: number, pages: number): (number | '…')[] {
 export function Pagination({
   page,
   total,
+  shown,
   href,
 }: {
   page: number;
   total: number;
+  /// How many rows are actually rendered. Normally PAGE_SIZE, but a snapshot shelf can hold fewer
+  /// than a full page — and a range that says "1–48" over 24 rows is the same lie this component was
+  /// added to remove, just from a different direction.
+  shown?: number;
   /// Builds the URL for a page — the caller owns its own query string.
   href: (page: number) => string;
 }) {
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const from = total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
-  const to = Math.min(page * PAGE_SIZE, total);
+  const to = Math.min((page - 1) * PAGE_SIZE + (shown ?? PAGE_SIZE), total);
 
   return (
     <nav className="pager" aria-label="Pagination">

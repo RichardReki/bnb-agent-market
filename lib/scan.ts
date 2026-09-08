@@ -10,6 +10,28 @@
 const BASE = process.env.SCAN_BASE ?? 'https://api.8004scan.io/api/v1';
 export const BSC_CHAIN_ID = 56;
 
+// The committed floor. Regenerate with `node tools/snapshot.mjs`; see that file for why it exists.
+// Imported rather than read at runtime so it is present on a cold serverless instance, which is
+// exactly the moment the in-process caches are empty and the upstream being down hurts most.
+import snapshotJson from '@/data/snapshot.json';
+
+interface Snapshot {
+  capturedAt: number;
+  shelves: Record<string, { query: string; items: Agent[]; total: number }>;
+  featured: Agent[] | null;
+  stats: GlobalStats | null;
+  details: Record<string, AgentDetail>;
+}
+const snapshot = snapshotJson as unknown as Snapshot;
+
+/// The snapshot's shelf for a query, if it has one. Only the first page was captured, so paging past
+/// it during an outage genuinely has nothing to show — better to say so than to invent a page.
+function snapshotShelf(query: string, offset: number): Shelf | null {
+  if (offset > 0) return null;
+  const hit = Object.values(snapshot.shelves).find((v) => v.query === query);
+  return hit ? { agents: hit.items, total: hit.total, staleAt: snapshot.capturedAt, fromSnapshot: true } : null;
+}
+
 // The API key, and why it matters more than it looks.
 //
 // 8004scan's published tiers: anonymous is 30 requests/minute and **1,000 per day**; a free key
@@ -201,6 +223,9 @@ export interface Shelf {
   /// When the data being shown was actually fetched, if the live request failed and this is the last
   /// good answer. Absent means live.
   staleAt?: number;
+  /// True when the data came from the committed snapshot rather than from something we read this
+  /// session — which can be much older, so the notice says so differently.
+  fromSnapshot?: boolean;
 }
 
 /// One page of agents matching `query` on BSC (best first) AND the total count, in ONE call — the
@@ -223,7 +248,7 @@ export async function shelf(query: string, opts: Query = {}): Promise<Shelf> {
     return unwrapShelf(j);
   } catch (e) {
     if (e instanceof StaleData) return { ...unwrapShelf(e.json as ShelfJson), staleAt: e.at };
-    return { agents: [], total: 0, degraded: true };
+    return snapshotShelf(query, opts.offset ?? 0) ?? { agents: [], total: 0, degraded: true };
   }
 }
 
@@ -242,7 +267,7 @@ function unwrapShelf(j: ShelfJson): Shelf {
 /// whose whole claim is that it reports the registry faithfully. During judging that is the worst
 /// available failure: a judge following a link we gave them lands on "this agent does not exist".
 export type DetailResult =
-  | { kind: 'ok'; agent: AgentDetail; staleAt?: number }
+  | { kind: 'ok'; agent: AgentDetail; staleAt?: number; fromSnapshot?: boolean }
   | { kind: 'missing' } // the registry says there is no such agent
   | { kind: 'degraded'; status: number | null }; // we could not ask
 
@@ -258,6 +283,8 @@ export async function agentDetail(chainId: number, tokenId: string): Promise<Det
       if (rec) return { kind: 'ok', agent: rec, staleAt: e.at };
     }
     if (e instanceof ScanError && e.status === 404) return { kind: 'missing' };
+    const shot = snapshot.details[String(tokenId)];
+    if (shot) return { kind: 'ok', agent: shot, staleAt: snapshot.capturedAt, fromSnapshot: true };
     return { kind: 'degraded', status: e instanceof ScanError ? e.status : null };
   }
 }
@@ -272,7 +299,7 @@ export async function globalStats(): Promise<GlobalStats> {
       const d = (e.json as { data?: GlobalStats }).data ?? (e.json as GlobalStats);
       if (d) return d as GlobalStats;
     }
-    return { total_agents: null, daily_new_agents: null, average_feedback_score: null };
+    return snapshot.stats ?? { total_agents: null, daily_new_agents: null, average_feedback_score: null };
   }
 }
 
@@ -295,7 +322,7 @@ export async function topAgents(limit = 8): Promise<Agent[]> {
     }
     // A bonus shelf: the landing already renders nothing when it is empty, so failing quietly here
     // costs a section rather than the page.
-    return [];
+    return snapshot.featured ?? [];
   }
 }
 

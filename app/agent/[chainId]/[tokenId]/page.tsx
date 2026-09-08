@@ -44,7 +44,7 @@ export default async function AgentPage({ params }: { params: { chainId: string;
 
   return (
     <>
-      <StaleNotice at={result.staleAt} />
+      <StaleNotice at={result.staleAt} fromSnapshot={result.fromSnapshot} />
       <section className="detail-hero">
         <a className="back" href="/">
           ← all agents
