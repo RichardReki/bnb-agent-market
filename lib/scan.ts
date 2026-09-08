@@ -99,6 +99,16 @@ interface Query {
   has_mcp?: boolean;
 }
 
+/// An upstream failure that still knows WHICH failure it was. The distinction is the whole point:
+/// a 404 means the registry does not have this agent, and anything else means we could not ask.
+/// Collapsing the two makes a database outage look like a missing agent, which is a claim about
+/// somebody else's data that we are not entitled to make.
+class ScanError extends Error {
+  constructor(readonly status: number, path: string) {
+    super(`8004scan ${status} ${path}`);
+  }
+}
+
 /// The upstream rate limit is 30 requests/minute without an API key — measured, not guessed: the
 /// 429 body reports `limit_value: 30, limit_type: "minute"` and the response carries `retry-after`.
 /// Browsing four category shelves and a few agents can reach that during a judging session, so a
@@ -114,6 +124,12 @@ async function get(path: string, params: Record<string, string | number | boolea
   const send = () =>
     fetch(url, {
       headers: { 'user-agent': 'agent-market/0.1', ...(API_KEY ? { 'X-API-Key': API_KEY } : {}) },
+      // Bounded because slow is its own failure. During an 8004scan outage the list endpoint took
+      // 27 seconds to answer, and a page that waits that long has already lost the visitor — a
+      // shelf that says "we could not reach the registry" in eight seconds is strictly better than
+      // the same content half a minute later. Eight is comfortably above the ~0.3s this normally
+      // takes, so it only fires when something is genuinely wrong.
+      signal: AbortSignal.timeout(8000),
       // Short cache: "real-time data quality" is a judged criterion, so keep it fresh but do not
       // hammer the rate limit on every request.
       next: { revalidate },
@@ -126,7 +142,7 @@ async function get(path: string, params: Record<string, string | number | boolea
     await new Promise((r) => setTimeout(r, wait));
     res = await send();
   }
-  if (!res.ok) throw new Error(`8004scan ${res.status} ${path}`);
+  if (!res.ok) throw new ScanError(res.status, path);
   return res.json();
 }
 
@@ -165,14 +181,28 @@ export async function shelf(query: string, opts: Query = {}): Promise<Shelf> {
   }
 }
 
+/// Why this is not just `AgentDetail | null`.
+///
+/// The registry answering "no such agent" and the registry not answering at all are different facts,
+/// and only the first one justifies a 404. This was found the hard way: 8004scan returned
+/// `500 DATABASE_ERROR` for ten minutes, and because a failed lookup collapsed to `null` the page
+/// called `notFound()` — so every real agent on BSC rendered as though it did not exist, on a site
+/// whose whole claim is that it reports the registry faithfully. During judging that is the worst
+/// available failure: a judge following a link we gave them lands on "this agent does not exist".
+export type DetailResult =
+  | { kind: 'ok'; agent: AgentDetail }
+  | { kind: 'missing' } // the registry says there is no such agent
+  | { kind: 'degraded'; status: number | null }; // we could not ask
+
 /// One agent's full record for the detail (Understand) page. Short cache — freshness is judged.
-export async function agentDetail(chainId: number, tokenId: string): Promise<AgentDetail | null> {
+export async function agentDetail(chainId: number, tokenId: string): Promise<DetailResult> {
   try {
     const j = await get(`/agents/${chainId}/${tokenId}`, {}, 20);
-    const rec = (j as { data?: AgentDetail }).data ?? (j as AgentDetail);
-    return (rec as AgentDetail) ?? null;
-  } catch {
-    return null;
+    const rec = ((j as { data?: AgentDetail }).data ?? (j as AgentDetail)) as AgentDetail | undefined;
+    return rec ? { kind: 'ok', agent: rec } : { kind: 'missing' };
+  } catch (e) {
+    if (e instanceof ScanError && e.status === 404) return { kind: 'missing' };
+    return { kind: 'degraded', status: e instanceof ScanError ? e.status : null };
   }
 }
 

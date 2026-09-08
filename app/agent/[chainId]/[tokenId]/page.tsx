@@ -7,8 +7,8 @@ import { probe, type EndpointStatus } from '@/lib/endpoint';
 export const revalidate = 20;
 
 export async function generateMetadata({ params }: { params: { chainId: string; tokenId: string } }) {
-  const a = await agentDetail(Number(params.chainId), params.tokenId);
-  return { title: a ? `${a.name ?? 'Agent'} — Agent Market` : 'Agent — Agent Market' };
+  const r = await agentDetail(Number(params.chainId), params.tokenId);
+  return { title: r.kind === 'ok' ? `${r.agent.name ?? 'Agent'} — Agent Market` : 'Agent — Agent Market' };
 }
 
 const num = (n: number | null | undefined, d = 0) => (n == null ? '—' : n.toFixed(d));
@@ -18,8 +18,15 @@ const num = (n: number | null | undefined, d = 0) => (n == null ? '—' : n.toFi
 // liveness block is where "real-time data quality, beyond basic counts" is earned.
 export default async function AgentPage({ params }: { params: { chainId: string; tokenId: string } }) {
   const chainId = Number(params.chainId);
-  const a = await agentDetail(chainId, params.tokenId);
-  if (!a) notFound();
+  const result = await agentDetail(chainId, params.tokenId);
+
+  // Only "the registry says there is no such agent" is a 404. When we simply could not ask — a rate
+  // limit, or the outage that exposed this, where 8004scan answered 500 DATABASE_ERROR for ten
+  // minutes — saying the agent does not exist would be inventing a fact about somebody else's
+  // registry. Say what actually happened instead.
+  if (result.kind === 'missing') notFound();
+  if (result.kind === 'degraded') return <RegistryUnreachable chainId={chainId} tokenId={params.tokenId} status={result.status} />;
+  const a = result.agent;
 
   const owner = a.owner_certified_name || a.owner_username || short(a.owner_address);
   const services: [string, AgentService][] = a.services
@@ -156,5 +163,36 @@ export default async function AgentPage({ params }: { params: { chainId: string;
         </p>
       </section>
     </>
+  );
+}
+
+/// What an agent page says when the registry could not be reached.
+///
+/// Deliberately not a 404 and deliberately not a blank error: a visitor who followed a link needs to
+/// know that the agent is probably fine and the lookup is not, and that reloading is worth trying.
+/// The BscScan link works regardless, because the chain is up even when an indexer is not.
+function RegistryUnreachable({ chainId, tokenId, status }: { chainId: number; tokenId: string; status: number | null }) {
+  return (
+    <section className="cat-hero">
+      <a className="back" href="/">
+        ← all agents
+      </a>
+      <div className="eyebrow" style={{ color: 'var(--gold)' }}>
+        Registry unreachable
+      </div>
+      <h1>Could not load agent #{tokenId}</h1>
+      <p>
+        The 8004scan registry did not answer{status ? ` (HTTP ${status})` : ''}, so we cannot show
+        this agent right now. That is our data source being down or rate-limiting us — it is not a
+        statement about whether the agent exists. Reload in a moment.
+      </p>
+      <p className="note" style={{ marginTop: 14 }}>
+        The chain itself is unaffected:{' '}
+        <a href={`https://bscscan.com/token/0x8004A169FB4a3325136EB29fA0ceB6D2e539a432?a=${tokenId}`} target="_blank" rel="noreferrer">
+          view token #{tokenId} on BscScan
+        </a>{' '}
+        (chain {chainId}).
+      </p>
+    </section>
   );
 }
